@@ -276,6 +276,7 @@ export default {
         link.source = link.sid
         link.target = link.tid
         if (!link.id) vm.$set(link, 'id', 'link-' + index)
+        // if (!link.id) vm.$set(link, 'id', link.sid + link.tid)
         return link
       })
     },

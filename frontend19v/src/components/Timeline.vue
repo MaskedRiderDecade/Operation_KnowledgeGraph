@@ -1,19 +1,20 @@
 <template>
   <!-- 时间线面板 -->
-  <div id="timelineContainer">
-    <div class="timeline" v-for="timeStamp in orderedTimeStamps" :key="timeStamp">
+  <div id="timeline-container">
+    <div class="timeline" v-for="(timeStamp,index) in orderedTimeStamps" :key="timeStamp">
+      <event-label :eventList="eventList" :timeStamp="timeStamp"></event-label>
       <div class="time">
-        <div class="line">----------------</div>
+        <div class="line">-------------------------</div>
         <!-- radio 有用 name 来区分多个表单，没有 name 默认是一个 -->
-        <input type="radio" :value="timeStamp" v-model="pickedTimeStamp" class="timePoint">
+        <input type="radio" :value="index" v-model="pickedTimeStamp" class="timePoint" />
         <div class="timeText">{{timeStamp.slice(0,10)}}</div>
         <div class="timeText">{{timeStamp.slice(11)}}</div>
       </div>
     </div>
     <div class="timeline">
       <div class="time">
-        <div class="line">----------------</div>
-        <input type="radio" value="now" v-model="pickedTimeStamp" class="timePoint">
+        <div class="line">-------------------------</div>
+        <input type="radio" value="now" v-model="pickedTimeStamp" class="timePoint" />
         <div class="timeText">now</div>
         <div class="timeText">&emsp;</div>
       </div>
@@ -22,13 +23,18 @@
 </template>
 
 <script>
+import EventLabel from "@/components/EventLabel";
 export default {
   props: {
-    allTimeStamps: Array
+    allTimeStamps: Array,
+    eventList: Array
+  },
+  components: {
+    EventLabel
   },
   data() {
     return {
-      pickedTimeStamp: "now"
+      pickedTimeStamp: "now" // pick 的时间戳的 index（now 除外）
     };
   },
   computed: {
@@ -46,35 +52,66 @@ export default {
   },
   watch: {
     pickedTimeStamp(newVal) {
-      this.$emit("click", newVal);
+      let lastVal = 0;
+      if (newVal) {
+        // 当不是第一个时间戳时
+        if (newVal === "now") {
+          // 如果是 now
+          lastVal = this.orderedTimeStamps.length - 1;
+        } else {
+          lastVal = newVal - 1;
+        }
+      } else {
+        // 如果是第一个时间戳 对比的数据是相同的就行
+        lastVal = newVal;
+      }
+      this.$emit(
+        "click",
+        newVal === "now" ? "now" : this.orderedTimeStamps[newVal],
+        this.orderedTimeStamps[lastVal]
+      );
     }
+  },
+  mounted() {
+    // 让滚动条在最右边
+    document.getElementById(
+      "timeline-container"
+    ).scrollLeft = document.getElementById("timeline-container").scrollWidth;
   }
 };
 </script>
 
 <style scoped>
-#timelineContainer {
+#timeline-container {
   position: fixed;
-  bottom: -110px;
+  /* bottom: -0px; */
+  bottom: -210px;
   width: 70%;
-  /* height: 100px; */
+  height: 200px;
   text-align: center;
+  white-space: nowrap; /* scroll x effects */
   overflow: auto;
   border: 1px solid lightgray;
   background-color: rgb(255, 255, 255);
   border-radius: 10px;
-  padding-bottom: 30px;
-  transition: bottom .3s;
+  padding-bottom: 20px;
+  transition: bottom 0.3s;
 }
-
-#timelineContainer:hover {
+#timeline-container::-webkit-scrollbar {
+  display: none;
+}
+#timeline-container:hover {
   bottom: 0px;
 }
 
 .timeline {
   display: inline-block;
+  width: 130px;
 }
-
+.time {
+  position: relative;
+  top: 35px;
+}
 .timePoint {
   position: relative;
   cursor: pointer;

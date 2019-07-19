@@ -7,13 +7,15 @@ Vue.use(Router)
 export default new Router({
   mode: 'history',
   base: process.env.BASE_URL,
-  routes: [{
-      path: '/',
-      name: 'main',
-      component: () => import( /* webpackChunkName: "about" */ './views/MainPage.vue'),
-    },
+  routes: [
+    // {
+    //   path: '/',
+    //   name: 'main',
+    //   component: () => import( /* webpackChunkName: "about" */ './views/MainPage.vue'),
+    // },
     {
-      path: '/main',
+      path: '/',
+      redirect: '/graph',
       name: 'mainpage',
       // route level code-splitting
       // this generates a separate chunk (about.[hash].js) for this route
@@ -46,8 +48,18 @@ export default new Router({
         },
         {
           path: 'class',
-          name: 'NewGraph',
+          name: 'ClassGraph',
           component: () => import('./views/ClassGraph.vue'),
+        },
+        {
+          path: 'struct',
+          name: 'DirStruct',
+          component: () => import('./views/DirStruct.vue'),
+        },
+        {
+          path: 'causerel',
+          name: 'CauseRel',
+          component: () => import('./views/CauseRel.vue'),
         }
       ]
     }

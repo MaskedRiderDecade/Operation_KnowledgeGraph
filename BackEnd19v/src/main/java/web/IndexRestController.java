@@ -1,34 +1,28 @@
 package web;
 
-import com.csvreader.CsvReader;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.sun.org.apache.xpath.internal.operations.Bool;
+import neo4j.MongoDriver;
 import neo4j.Neo4jDriver;
-import net.sf.json.JSON;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.web.bind.annotation.*;
-
-import java.io.*;
-import java.net.URL;
-import java.net.URLConnection;
-import java.sql.Time;
-import java.util.*;
-
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.commons.CommonsMultipartFile;
 import org.yaml.snakeyaml.Yaml;
+import util.TimerUtil;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.*;
+import java.util.*;
 
 import static neo4j.FusekiDriver.*;
 import static neo4j.Neo4jDriver.*;
+import static neo4j.prometheusDriver.DealPrometheusRequest;
+import static neo4j.prometheusDriver.newPrometheus;
 
 
 @RestController
@@ -412,8 +406,10 @@ public class IndexRestController {
         String filePath = savePath + "/"  + filename;
         try{
            // File file = new File(filePath);
+            System.out.println("66");
             return csvPost(algorithm,filePath);
         }catch (Exception e) {
+            System.out.println("66");
             e.printStackTrace();
         }
         return null;
@@ -422,9 +418,20 @@ public class IndexRestController {
 
 
 
+
+
+
+
+
+
+
+
+
     @RequestMapping(value = "/api/storeEnvironment",method = RequestMethod.POST,produces = "application/json")
     public Boolean storeAll(@RequestParam("masterName") String masterName, @RequestParam("podName") String podName, @RequestParam("serviceName") String serviceName, @RequestParam("address") String address, @RequestParam("namespace") String namespace){
         boolean result = true;
+        MongoDriver mongoDriver = new MongoDriver();
+        result &= mongoDriver.clear_db();
         result &= storeNamespaceName();
         result &= storeServerName();
         result &= storeMasterNode(masterName);
@@ -436,30 +443,6 @@ public class IndexRestController {
         result &= podToServer(address, namespace);
         return result;
     }
-
-//    @RequestMapping(value = "/api/storeNameSpace",method = RequestMethod.POST,produces = "application/json")
-//    public Boolean storeNameSpace(){
-//        return storeNamespace();
-//    }
-//
-//    @RequestMapping(value = "/api/storeNamespaceName",method = RequestMethod.POST,produces = "application/json")
-//    public Boolean storeNamespaceName(){ return storeNamespaceName(); }
-//
-//    @RequestMapping(value = "/api/storeServer",method = RequestMethod.POST,produces = "application/json")
-//    public Boolean storeServer(){ return storeServerName(); }
-//
-//    @RequestMapping(value = "/api/storeMasterNode",method = RequestMethod.POST,produces = "application/json")
-//    public Boolean storeMasterNode(@RequestParam("masterName") String masterName){ return storeMasterNode(masterName); }
-//
-//    @RequestMapping(value = "/api/storePod",method = RequestMethod.POST,produces = "application/json")
-//    public Boolean storePod(@RequestParam("podName") String podName){
-//        return storePodName(podName);
-//    }
-//
-//    @RequestMapping(value = "/api/storeService",method = RequestMethod.POST,produces = "application/json")
-//    public Boolean storeService(@RequestParam("serviceName") String serviceName){
-//        return storeServiceName(serviceName);
-//    }
 
     @RequestMapping(value = "/api/getNodesAndLinks",method = RequestMethod.GET,produces = "application/json")
     public Map<String, Object> getNodesAndLinks(){
@@ -479,6 +462,11 @@ public class IndexRestController {
     @RequestMapping(value = "/api/addNewLink",method = RequestMethod.POST,produces = "application/json")
     public Boolean addNewLink(@RequestBody HashMap data){
         return addLink(data);
+    }
+
+    @RequestMapping(value = "/api/addNewEvent",method = RequestMethod.POST,produces = "application/json")
+    public Boolean addNewEvent(@RequestBody HashMap data){
+        return readJekins(data);
     }
 
     @RequestMapping(value = "/api/deleteAll",method = RequestMethod.POST,produces = "application/json")
@@ -505,4 +493,53 @@ public class IndexRestController {
     public Boolean modifyOneLink(@RequestBody HashMap data){
         return modifyLink(data);
     }
+
+    @RequestMapping(value = "/api/createPrometheus", method = RequestMethod.POST, produces = "application/json")
+    public Boolean createPrometheus(@RequestBody HashMap data) { return newPrometheus(data);}
+
+    private TimerUtil timerUtil = new TimerUtil();
+
+    @RequestMapping(value = "/api/openTimer", method = RequestMethod.POST, produces = "application/json")
+    public Boolean openTimer(@RequestBody Integer period){
+        try {
+            // 匿名方法
+            Runnable runnable = () -> {
+                // 把当前数据库中所有数据存到mongodb中
+                Map<String, Object> result = getNodesAndLinks();
+                save2Mongo(result);
+            };
+            final long time = 5;//延迟执行实际：5秒
+            timerUtil.scheduleAtFixedRate(runnable,time,period);
+            System.out.println("定时存储Mongo服务已开启！模拟数据变化频率："+period+"秒");
+        } catch (Exception e){
+            e.printStackTrace();
+            System.out.println("调用timer失败");
+            return false;
+        }
+        return true;
+    }
+
+    @RequestMapping(value = "/api/shutdownTimer", method = RequestMethod.POST, produces = "application/json")
+    public Boolean shutdownTimer(){
+        try {
+            timerUtil.shutdown();
+            System.out.println("定时存储Mongo服务已关闭");
+        } catch (Exception e){
+            e.printStackTrace();
+            System.out.println("调用timer失败");
+            return false;
+        }
+        return true;
+    }
+
+    @RequestMapping(value = "/api/StartCausation", method = RequestMethod.POST, produces = "application/json")
+    public Boolean StartCausation(HttpServletRequest request,@RequestParam("Start") String start,@RequestParam("End") String end){
+        String savePath = request.getSession().getServletContext().getRealPath("/WEB-INF/upload/csv");
+        savePath = savePath.replace("file:", "");
+        ArrayList arrayList = getAllQuery();
+        DealPrometheusRequest(start,end,arrayList,savePath);
+        return true;
+    }
+
+
 }
